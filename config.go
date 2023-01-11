@@ -1,4 +1,4 @@
-package config
+package jsonconf
 
 import (
 	"encoding/json"
@@ -7,23 +7,23 @@ import (
 	"os"
 )
 
-//------------ Переменные ----------------------------------------------------
+// ------------ Переменные ----------------------------------------------------
 var ()
 
 //------------ Структуры ----------------------------------------------------
 
 //------------ Функции ----------------------------------------------------
 
-//Открытие файла конфигурации и запись данных в структуру.
-//file - путь к файлу с настройками, configStruct - указатель на экземпляр структуры данных.
-func ParseFile(file string, configStruct interface{}) error {
+// Открытие файла конфигурации и запись данных в структуру.
+// file - путь к файлу с настройками, configStruct - указатель на экземпляр структуры данных.
+func DecodeFile(file string, configStruct interface{}) error {
 	var (
 		err error
 		f   *os.File
 	)
-	f, err = os.Open(file) //открываем файл
+	f, err = os.OpenFile(file, os.O_RDONLY, 0644) //открываем файл
 	if err != nil {
-		return fmt.Errorf("func ParseFile: %s", err)
+		return fmt.Errorf("func ParseFile: ошибка открытия файла: %s", err)
 	}
 	defer f.Close()
 	err = json.NewDecoder(f).Decode(configStruct) //извлечение данных из json и запись в configStruct
@@ -33,17 +33,17 @@ func ParseFile(file string, configStruct interface{}) error {
 	return nil
 }
 
-//Открытие файла конфигурации и запись данных в структуру.
-//file - путь к файлу с настройками, configStruct - указатель на экземпляр структуры данных.
-//Если файл не найден, то создается новый с данными из defaultFile.
-func ParseFileOrDefault(file, defaultFile string, configStruct interface{}) error {
+// Открытие файла конфигурации и запись данных в структуру.
+// file - путь к файлу с настройками, configStruct - указатель на экземпляр структуры данных.
+// Если файл не найден, то создается новый с данными из defaultFile.
+func DecodeFileOrDefault(file, defaultFile string, configStruct interface{}) error {
 	if _, err := os.Stat(file); os.IsNotExist(err) { //если файла нет, то копируем defaultFile
 		err = copyFile(file, defaultFile)
 		if err != nil {
 			return err
 		}
 	}
-	return ParseFile(file, configStruct)
+	return DecodeFile(file, configStruct)
 }
 
 func copyFile(dst, src string) error {
