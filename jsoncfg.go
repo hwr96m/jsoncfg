@@ -1,4 +1,4 @@
-package jsonconf
+package jsoncfg
 
 import (
 	"encoding/json"
