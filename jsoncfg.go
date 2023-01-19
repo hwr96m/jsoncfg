@@ -3,7 +3,6 @@ package jsoncfg
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 )
@@ -39,21 +38,27 @@ func DecodeFile(file string, configStructs ...interface{}) error {
 
 // Открытие файла конфигурации и запись данных в структуру.
 // file - путь к файлу с настройками, configStruct - указатель на экземпляр структуры данных.
-// Если файл не найден, то создается новый с данными из defaultFile.
-func DecodeFileOrDefault(file, defaultFile string, configStructs ...interface{}) error {
-	if _, err := os.Stat(file); os.IsNotExist(err) { //если файла нет, то копируем defaultFile
-		err = copyFile(file, defaultFile)
+// Если файл не найден, то создается новый со структурой данных configStructs.
+func DecodeFileOrCreate(file string, configStruct interface{}) error {
+	fi, err := os.Stat(file)
+	switch {
+	case fi.IsDir(): //если указан не файл, а папка
+		return fmt.Errorf("func DecodeFileOrDefault(): вместо файла указан путь до папки: %+v", err)
+	case os.IsNotExist(err): //если не существует
+		err = EncodeFileMinify(file, configStruct, 0600)
 		if err != nil {
-			return fmt.Errorf("func DecodeFileOrDefault(): %s", err)
+			return fmt.Errorf("func DecodeFileOrDefault(): создание файла: %+v", err)
 		}
+		return fmt.Errorf("файл не найден, был создан новый")
+	default:
+		return DecodeFile(file, configStruct)
 	}
-	return DecodeFile(file, configStructs)
 }
 
 // Запись структуры в файл с форматированием
 func EncodeFile(file string, configStruct interface{}, perm fs.FileMode) error {
 	//сохраняем информацию о сессии в файл
-	f, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC, perm)
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, perm)
 	if err != nil {
 		return fmt.Errorf("func EncodeFile(): open file %s: %s", file, err)
 	}
@@ -83,7 +88,7 @@ func EncodeFileMinify(file string, configStruct interface{}, perm fs.FileMode) e
 
 //------------ Локальные функции ---------------------------------------------------------
 
-func copyFile(dst, src string) error {
+/* func copyFile(dst, src string) error {
 	fsrc, err := os.Open(src)
 	if err != nil {
 		return err
@@ -101,4 +106,4 @@ func copyFile(dst, src string) error {
 		return err
 	}
 	return nil
-}
+}*/
