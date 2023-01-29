@@ -3,8 +3,11 @@ package jsoncfg
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
+	"regexp"
 )
 
 // ------------ Переменные ----------------------------------------------------
@@ -17,6 +20,7 @@ var ()
 // Открытие файла конфигурации и запись данных в структуру.
 // file - путь к файлу с настройками, configStructs - указатели на экземпляр структуры данных.
 // Можно указать несколько структур
+// Поддерживает файлы .jsonc
 func DecodeFile(file string, configStructs ...interface{}) error {
 	var (
 		err error
@@ -27,10 +31,29 @@ func DecodeFile(file string, configStructs ...interface{}) error {
 		return fmt.Errorf("func DecodeFile: ошибка открытия файла: %s", err)
 	}
 	defer f.Close()
-	for _, configStruct := range configStructs {
-		err = json.NewDecoder(f).Decode(configStruct) //извлечение данных из json и запись в configStruct
+
+	if filepath.Ext(file) == ".jsonc" { //если на вход получили .jsonc, то удаляем комментарии
+		js, err := io.ReadAll(f)
 		if err != nil {
-			return fmt.Errorf("func DecodeFile: json.NewDecoder(f).Decode: %s", err)
+			return fmt.Errorf("func DecodeFile(): io.ReadAll: %w", err)
+		}
+		re, err := regexp.Compile(`//.*[^\r\n]`)
+		if err != nil {
+			return fmt.Errorf("func DecodeFile(): regexp.Compile: %w", err)
+		}
+		js = re.ReplaceAll(js, []byte{})
+		for _, configStruct := range configStructs {
+			err = json.Unmarshal(js, configStruct) //извлечение данных из json и запись в configStruct
+			if err != nil {
+				return fmt.Errorf("func DecodeFile: Unmarshal: %s", err)
+			}
+		}
+	} else {
+		for _, configStruct := range configStructs {
+			err = json.NewDecoder(f).Decode(configStruct) //извлечение данных из json и запись в configStruct
+			if err != nil {
+				return fmt.Errorf("func DecodeFile: Decode: %s", err)
+			}
 		}
 	}
 	return nil
@@ -42,14 +65,14 @@ func DecodeFile(file string, configStructs ...interface{}) error {
 func DecodeFileOrCreate(file string, configStruct interface{}) error {
 	fi, err := os.Stat(file)
 	switch {
-	case fi.IsDir(): //если указан не файл, а папка
-		return fmt.Errorf("func DecodeFileOrDefault(): вместо файла указан путь до папки: %+v", err)
 	case os.IsNotExist(err): //если не существует
-		err = EncodeFileMinify(file, configStruct, 0600)
+		err = EncodeFile(file, configStruct, 0600)
 		if err != nil {
 			return fmt.Errorf("func DecodeFileOrDefault(): создание файла: %+v", err)
 		}
 		return fmt.Errorf("файл не найден, был создан новый")
+	case fi.IsDir(): //если указан не файл, а папка
+		return fmt.Errorf("func DecodeFileOrDefault(): вместо файла указан путь до папки: %+v", err)
 	default:
 		return DecodeFile(file, configStruct)
 	}
@@ -74,7 +97,7 @@ func EncodeFile(file string, configStruct interface{}, perm fs.FileMode) error {
 // Запись структуры в файл, минифицированная версия
 func EncodeFileMinify(file string, configStruct interface{}, perm fs.FileMode) error {
 	//сохраняем информацию о сессии в файл
-	f, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC, perm)
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, perm)
 	if err != nil {
 		return fmt.Errorf("func EncodeFileMinify(): open file %s: %s", file, err)
 	}
