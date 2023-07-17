@@ -1,3 +1,3 @@
-module home.rep/go-libs/jsoncfg.git
+module github.com/hwr96m/jsoncfg
 
 go 1.19
